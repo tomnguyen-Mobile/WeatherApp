@@ -35,6 +35,7 @@ import kotlinx.coroutines.withContext
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import android.util.Log
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?){
@@ -58,9 +59,13 @@ fun WeatherScreen(){
     var cityResult by remember { mutableStateOf("City: --") }
     var tempResult by remember { mutableStateOf("Temperature: --") }
     var descResult by remember { mutableStateOf("Description: --") }
+    var windResult by remember { mutableStateOf("Wind Speed: --") }
+    var humidityResult by remember { mutableStateOf("HumidityResult: --") }
+    var isLoading by remember { mutableStateOf(false) }
+    var debug_text: String=""
+
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    var debug_text: String=""
     Scaffold(   // my emulator phone has a camera on top this help adjust it
         topBar={TopAppBar(title={Text("Weather App")})}
     ) { padding ->
@@ -72,6 +77,7 @@ fun WeatherScreen(){
                 modifier = Modifier.fillMaxWidth()
             ) // end of text field
             Button(
+                enabled = !isLoading, // when the button clicks it will turn isLoading to true
                 onClick = {
                     val trimmedCity:String= city.trim()
                     if(trimmedCity.isEmpty()){
@@ -81,6 +87,7 @@ fun WeatherScreen(){
                             Toast.LENGTH_SHORT
                         ).show()
                     }else{
+                        isLoading = true
                         // Assignment 1 -- implement real weather fetch here
                         // Steps to complete:
                         // 1. Add these imports at the top of the file: rememberCoroutineScope,
@@ -101,19 +108,31 @@ fun WeatherScreen(){
                                         units = AppConstants.UNITS
                                     )
                                 }   // end of withContext
+                                Log.d("WeatherApp", "Request URL: ${response.raw().request.url}")
+                                Log.d("WeatherApp", "Request Code: ${response.code()}")
                                 // 6. If response.isSuccessful, update cityResult / tempResult / descResult
                                 val weatherResponse = response.body() // if this is null
                                 if(response.isSuccessful && weatherResponse != null){
                                     cityResult = "City: ${weatherResponse.cityName}"
                                     tempResult = "Temperature: ${weatherResponse.main.temp}°F"
                                     descResult = "Description: ${weatherResponse.weather[0].description}"
+                                    windResult = "Wind Speed: ${weatherResponse.wind.speed} m/s"
+                                    humidityResult = "HumidityResult: ${weatherResponse.main.humidity} %"
                                     val formatter = SimpleDateFormat("MMMM dd, yyyy", Locale.getDefault())
                                     val date = formatter.format(Date(weatherResponse.dt * 1000))
                                     dateResult = date
                                     debug_text = response.body().toString()
                                 }else{
-                                    // 7. If NOT successful, show a Toast: "City not found. Check the name and try again."
-                                    Toast.makeText(context, "City not found. Check the name and try again", Toast.LENGTH_SHORT).show()
+                                    // replace with response.code() either 404, 401, or anything else
+                                    if(response.code()==401){
+                                        Toast.makeText(context, "Unauthorized, please check your API key.", Toast.LENGTH_SHORT).show()
+                                    } else if (response.code() == 404){
+                                        // 7. If NOT successful, show a Toast: "City not found. Check the name and try again."
+                                        Toast.makeText(context, "City not found. Check the name and try again", Toast.LENGTH_SHORT).show()
+                                    } else{
+                                        Toast.makeText(context, "Network error. Check your connection.", Toast.LENGTH_SHORT).show()
+
+                                    }
                                 } // end of if-else statement
                             } catch(e: Exception) {
                                 // 8.1   "Network error. Check your connection." in the catch block
@@ -123,17 +142,22 @@ fun WeatherScreen(){
                                     Toast.LENGTH_SHORT
                                 ).show()
                             }// end of try-catch block
+                            finally{
+                                isLoading = false
+                            }// end of finally
                         } // end of scope
                     }//end of if-else-statement
                 },
                 modifier = Modifier.fillMaxWidth().padding(top=8.dp),
             ){
-                Text("Get Weather")
+                Text(if(isLoading) "Loading..." else "Get Weather")
             } // end of button
             Text(dateResult, fontSize=20.sp, modifier=Modifier.padding(top=24.dp))
             Text(cityResult, fontSize=20.sp, modifier=Modifier.padding(top=8.dp))
             Text(tempResult, fontSize=20.sp, modifier=Modifier.padding(top=8.dp))
             Text(descResult, fontSize=20.sp, modifier=Modifier.padding(top=8.dp))
+            Text(windResult, fontSize=20.sp, modifier=Modifier.padding(top=8.dp))
+            Text(humidityResult, fontSize=20.sp, modifier=Modifier.padding(top=8.dp))
 //            Text(debug_text, fontSize=20.sp, modifier=Modifier.padding(top=8.dp))
         }// end of Column
     }// end of scaffold
