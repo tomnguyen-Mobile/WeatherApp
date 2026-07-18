@@ -1,6 +1,9 @@
 package com.mdi2.weatherapp
 
+// Assignment 1 imports
+
 import android.os.Bundle
+import android.util.Log
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -10,8 +13,10 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
@@ -20,13 +25,13 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-// Assignment 1 imports
-import androidx.compose.runtime.rememberCoroutineScope
+import com.mdi2.weatherapp.data.FeedbackRequest
 import com.mdi2.weatherapp.network.AppConstants
 import com.mdi2.weatherapp.network.RetrofitClient
 import kotlinx.coroutines.Dispatchers
@@ -35,7 +40,7 @@ import kotlinx.coroutines.withContext
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
-import android.util.Log
+
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?){
@@ -62,6 +67,10 @@ fun WeatherScreen(){
     var windResult by remember { mutableStateOf("Wind Speed: --") }
     var humidityResult by remember { mutableStateOf("HumidityResult: --") }
     var isLoading by remember { mutableStateOf(false) }
+    var currentCity by remember { mutableStateOf("") }
+    var rating by remember { mutableStateOf(3) }
+    var comment by remember { mutableStateOf("") }
+    var feedbackResult by remember { mutableStateOf("") }
     var debug_text: String=""
 
     val context = LocalContext.current
@@ -118,6 +127,7 @@ fun WeatherScreen(){
                                     descResult = "Description: ${weatherResponse.weather[0].description}"
                                     windResult = "Wind Speed: ${weatherResponse.wind.speed} m/s"
                                     humidityResult = "HumidityResult: ${weatherResponse.main.humidity} %"
+                                    currentCity = trimmedCity
                                     val formatter = SimpleDateFormat("MMMM dd, yyyy", Locale.getDefault())
                                     val date = formatter.format(Date(weatherResponse.dt * 1000))
                                     dateResult = date
@@ -158,7 +168,80 @@ fun WeatherScreen(){
             Text(descResult, fontSize=20.sp, modifier=Modifier.padding(top=8.dp))
             Text(windResult, fontSize=20.sp, modifier=Modifier.padding(top=8.dp))
             Text(humidityResult, fontSize=20.sp, modifier=Modifier.padding(top=8.dp))
+            HorizontalDivider(modifier = Modifier.padding(top=24.dp, bottom= 16.dp))
+            Text(
+                text="How do you feel about today's weather?",
+                fontSize=20.sp,
+                modifier=Modifier.padding(top=8.dp)
+            )
 //            Text(debug_text, fontSize=20.sp, modifier=Modifier.padding(top=8.dp))
+            Slider(
+                value = rating.toFloat(),
+                onValueChange = { rating=it.toInt()},
+                valueRange = 1f..5f,
+                steps = 3,
+            )
+
+
+            Text("Rating: $rating/5", fontSize=20.sp)
+
+            TextField(
+                value=comment,
+                onValueChange = { comment=it },
+                label={ Text("Leave a comment about the weather...")},
+                minLines=3,
+                modifier=Modifier.fillMaxWidth().padding(top=8.dp),
+
+            )
+
+            Button (
+                onClick = {
+                    if(currentCity.isEmpty()){
+                        Toast.makeText(
+                            context,
+                            "Please fetch weather for a city first",
+                            Toast.LENGTH_SHORT)
+                            .show()
+                    } else if (comment.isBlank()){
+                        Toast.makeText(
+                            context,
+                            "Please leave a comment",
+                            Toast.LENGTH_SHORT)
+                            .show()
+                    } else{
+                       scope.launch {
+                           try {
+                               val request = FeedbackRequest(
+                                   city = currentCity,
+                                    rating=rating,
+                                   comment=comment
+                                   )
+                               val response = withContext(Dispatchers.IO){
+                                   RetrofitClient.feedbackApiService.submitFeedback(request)
+                               }
+                               // assignment 3
+                               // 1. if response.isSuccessful : set feedbackResult to a success message,
+                               if(response.isSuccessful){
+                                   feedbackResult = "Feedback submitted successfully!"
+                                    //   then clear the comment field and reset rating back to 3
+                                   comment = ""
+                                   rating = 3
+                               } else {
+                                // 2. If NOT successful: set feedbackResult to a failure message
+                                    feedbackResult = "Failed to submit feedback. Please try again."
+                               }
+
+                           } catch(e:Exception){
+                               feedbackResult = "Error submitting feedback. check your connection."
+                           }
+                       }
+                    }
+                },
+                modifier = Modifier.fillMaxWidth().padding(top=8.dp)
+            ){
+                Text("Submit Feedback")
+            }
+                Text(feedbackResult, fontSize=14.sp, modifier= Modifier.padding(top=8.dp))
         }// end of Column
     }// end of scaffold
 
