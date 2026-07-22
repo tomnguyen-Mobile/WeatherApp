@@ -7,14 +7,17 @@ import android.util.Log
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Button
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
@@ -27,6 +30,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
@@ -45,6 +49,7 @@ import java.util.Locale
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?){
         super.onCreate(savedInstanceState)
+        RetrofitClient.init(this)
         setContent {
            MaterialTheme{
                Surface(modifier = Modifier.fillMaxSize()){
@@ -71,6 +76,7 @@ fun WeatherScreen(){
     var rating by remember { mutableStateOf(3) }
     var comment by remember { mutableStateOf("") }
     var feedbackResult by remember { mutableStateOf("") }
+    var feedbackLoading by remember { mutableStateOf(false) }
     var debug_text: String=""
 
     val context = LocalContext.current
@@ -162,12 +168,30 @@ fun WeatherScreen(){
             ){
                 Text(if(isLoading) "Loading..." else "Get Weather")
             } // end of button
+            if (isLoading) {
+                Box(
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(top = 16.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    CircularProgressIndicator()
+                }
+            }
             Text(dateResult, fontSize=20.sp, modifier=Modifier.padding(top=24.dp))
             Text(cityResult, fontSize=20.sp, modifier=Modifier.padding(top=8.dp))
             Text(tempResult, fontSize=20.sp, modifier=Modifier.padding(top=8.dp))
             Text(descResult, fontSize=20.sp, modifier=Modifier.padding(top=8.dp))
             Text(windResult, fontSize=20.sp, modifier=Modifier.padding(top=8.dp))
             Text(humidityResult, fontSize=20.sp, modifier=Modifier.padding(top=8.dp))
+
+            OutlinedButton(
+                onClick={
+                    RetrofitClient.clearCache()
+                    Toast.makeText(context, "Cache Cleared", Toast.LENGTH_SHORT).show()
+                },
+                modifier = Modifier.fillMaxWidth().padding(top=8.dp),
+            ){ Text("Clear cache")}
             HorizontalDivider(modifier = Modifier.padding(top=24.dp, bottom= 16.dp))
             Text(
                 text="How do you feel about today's weather?",
@@ -209,6 +233,15 @@ fun WeatherScreen(){
                             Toast.LENGTH_SHORT)
                             .show()
                     } else{
+                        // ASSIGNMENT 4:
+                        // 1. Declare " var feedback loading by remember { mutableStateOf(false) }
+                        //    near the top of WeatherScreen(), next to the other state variables
+                        // 2. Set feedback Loading = true right before the feedback scope.launch{}
+                        feedbackLoading = true
+                        // 3. Set feedbackLoading = false inside a finally { } wrapped around the
+                        //    feedback try/catch -- same shape as Get Weather's finally block
+                        // 4. On the Submit Feedback Button: add enable = !feedbackLoading
+                        //    and swap its text to "Submitting..." while feedback Loading is true
                        scope.launch {
                            try {
                                val request = FeedbackRequest(
@@ -233,13 +266,26 @@ fun WeatherScreen(){
 
                            } catch(e:Exception){
                                feedbackResult = "Error submitting feedback. check your connection."
+                           } finally {
+                               feedbackLoading = false
                            }
                        }
                     }
                 },
+                enabled = !feedbackLoading,
                 modifier = Modifier.fillMaxWidth().padding(top=8.dp)
             ){
-                Text("Submit Feedback")
+                Text(if(feedbackLoading) "Submitting..." else "Submit Feedback")
+            }
+            if (feedbackLoading) {
+                Box(
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(top = 16.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    CircularProgressIndicator()
+                }
             }
                 Text(feedbackResult, fontSize=14.sp, modifier= Modifier.padding(top=8.dp))
         }// end of Column
